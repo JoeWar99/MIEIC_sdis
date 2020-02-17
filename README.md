@@ -5,7 +5,7 @@
 > **Course:** Sistemas Distribuidos: [SDIS page in sigarra](https://sigarra.up.pt/feup/en/ucurr_geral.ficha_uc_view?pv_ocorrencia_id=4364513) | Distributed Systems
 >
 > **Project developed by:**\
-> Martim Silva ([motapinto](https://github.com/motapinto))
+> Martim Silva ([motapinto](https://github.com/motapinto)) \
 > José Guerra ([LockDownPT](https://github.com/LockDownPT))
 >
 > **Any problems?**\
