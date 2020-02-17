@@ -6,6 +6,7 @@
 >
 > **Project developed by:**\
 > Martim Silva ([motapinto](https://github.com/motapinto))
+> José Guerra ([LockDownPT](https://github.com/LockDownPT))
 >
 > **Any problems?**\
 > Start an Issue please.
