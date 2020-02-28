@@ -1,12 +1,60 @@
-
-import java.io.*;
-import java.net.DatagramPacket;
-import java.net.DatagramSocket;
-import java.net.InetAddress;
-import java.nio.charset.StandardCharsets;
+import java.io.IOException;
+import java.net.*;
 import java.util.HashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
+import java.util.regex.Pattern;
 
-public class server {
+public class Server {
+
+    // regex used to check if the IP address for the server sent from the command line is a valid one or not
+    private static final String IPv4_REGEX = "^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$";
+    private static final Pattern IPv4_PATTERN = Pattern.compile(IPv4_REGEX);
+
+    /**
+     * class method used to verify the IP address for the server sent from the command line, uses simple regex + Custom Validations
+     * @param ip the IP address we wish to validate
+     * @return true if valid IP address, false otherwise
+     */
+    public static boolean isValidInet4Address(String ip) {
+        if (ip == null) {
+            return false;
+        }
+        if (!IPv4_PATTERN.matcher(ip).matches())
+            return false;
+        String[] parts = ip.split("\\.");
+
+        // verify that each of the four subgroups of IPv4 address is legal
+        try {
+            for (String segment : parts) {
+                // x.0.x.x is accepted but x.01.x.x is not
+                if (Integer.parseInt(segment) > 255 ||
+                        (segment.length() > 1 && segment.startsWith("0"))) {
+                    return false;
+                }
+            }
+        } catch (NumberFormatException e) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Class method to see if the port is available or not
+     * @param port
+     * @return true if the port isn't being used by a service, false otherwise
+     */
+    private static boolean available(int port) {
+        try (Socket ignored = new Socket("localhost", port)) {
+            return false;
+        } catch (IOException ignored) {
+            return true;
+        }
+    }
+
+    private static DatagramSocket socket = null;
+
     /**
      * Class method used to send a response to a client's command
      * @param messageToSend message that we want to send to the client in string form
@@ -37,15 +85,15 @@ public class server {
         socket.send(DpSent);
     }
 
-
     public static void main(String[] args) throws IOException {
 
         // checking to see if the server is initialized with the correct parameters that being the number of the port we are
         // going to use for the communication (4445)
-        if (args.length != 1) {
-            System.out.println("Usage: java Server <port number>");
+        if (args.length != 3) {
+            System.out.println("Usage: java Server <srvc_port> <mcast_address> <mcast_port>");
             return;
         }
+
 
         // byte array used to receive the datagram data since it comes in bytes
         byte[] receivedBytes;
@@ -63,7 +111,7 @@ public class server {
         int port = Integer.parseInt(args[0]);
 
         // creating the socket to send messages to and receive from
-        DatagramSocket socket = new DatagramSocket(port);
+        socket = new DatagramSocket(port);
 
         // hashmap to hold all the combinations of dns names and ip addresses
         HashMap<String, String> dnsHashMap = new HashMap<String, String>();
@@ -77,6 +125,17 @@ public class server {
 
         // used to store the parameters and operation received from the client
         String[] tokens;
+
+        Runnable runnable;
+        //InetAddress multicastAddress = InetAddress.getByName(args[1]);
+        InetAddress multicastAddress = InetAddress.getLocalHost();
+        int multicastPort = Integer.parseInt(args[2]);
+        int port1 = Integer.parseInt(args[0]);
+        InetAddress serverAddress = InetAddress.getLocalHost();
+
+        runnable = new MyRunnable(multicastAddress, multicastPort,serverAddress, port1);
+        ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+        service.scheduleAtFixedRate(runnable, 0, 1, TimeUnit.SECONDS);
 
         // main part of the server's code
         while(true){
@@ -209,6 +268,51 @@ public class server {
                     break;
             }
             System.out.println("Server's Response: " + response);
+        }
+    }
+
+    public static class MyRunnable implements Runnable {
+
+        private InetAddress multicastAddress;
+        private int multicastPort;
+        private InetAddress serverAddress;
+        private int serverPort;
+        private String advertisement;
+        private DatagramSocket socket;
+
+
+        public MyRunnable(InetAddress multicastAddress, int multicastPort, InetAddress serverAddress, int serverPort){
+
+            this.multicastAddress = multicastAddress;
+            this.multicastPort = multicastPort;
+            this.serverAddress = serverAddress;
+            this.serverPort = serverPort;
+            this.advertisement = serverAddress + ":" + serverPort;
+
+        }
+
+        public void run() {
+
+            try {
+                this.socket = new DatagramSocket();
+            } catch (SocketException e) {
+                e.printStackTrace();
+                return;
+            }
+
+            InetAddress group = this.multicastAddress;
+            byte[] buf = this.advertisement.getBytes();
+
+            DatagramPacket packet = new DatagramPacket(buf, buf.length, group, this.multicastPort);
+
+            try {
+                this.socket.send(packet);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+            this.socket.close();
+
         }
     }
 }
