@@ -12,6 +12,16 @@ public class Server {
     private static final String IPv4_REGEX = "^(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})$";
     private static final Pattern IPv4_PATTERN = Pattern.compile(IPv4_REGEX);
 
+    private static DatagramSocket socket = null;
+    private final InetAddress multicastAddress;
+    private final int multicastPort;
+    private InetAddress serverAddress;
+    private final int serverPort;
+    private HashMap<String, String> dnsHashMap;
+    private DatagramPacket packetReceived;
+    private String command;
+    private  String response;
+
     /**
      * class method used to verify the IP address for the server sent from the command line, uses simple regex + Custom Validations
      * @param ip the IP address we wish to validate
@@ -53,8 +63,6 @@ public class Server {
         }
     }
 
-    private static DatagramSocket socket = null;
-
     /**
      * Class method used to send a response to a client's command
      * @param messageToSend message that we want to send to the client in string form
@@ -85,7 +93,7 @@ public class Server {
         socket.send(DpSent);
     }
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) {
 
         // checking to see if the server is initialized with the correct parameters that being the number of the port we are
         // going to use for the communication (4445)
@@ -94,133 +102,145 @@ public class Server {
             return;
         }
 
+        if(!isValidInet4Address(args[1])){
+            System.out.println("The multicast address is not a valid one");
+            return;
+        }
 
-        // byte array used to receive the datagram data since it comes in bytes
-        byte[] receivedBytes;
+        if(!available(Integer.parseInt(args[0]))){
+            System.out.println("The port " + args[1] + ", that was to be used by the server to respond to clients commands is already in use by another service");
+            return;
+        }
 
-        // the string we are going to use to store the converted bytes into readable text UTF8
-        String receivedString;
+        InetAddress serverAddress = null;
+        try {
+            serverAddress = InetAddress.getLocalHost();
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+            return;
+        }
 
-        // The datagramPacket variable we are going to store the datagram we received from the client
-        DatagramPacket DpReceived;
+        InetAddress multicastAddress = null;
+        try {
+            multicastAddress = InetAddress.getByName(args[1]);
+        } catch (UnknownHostException e) {
+            e.printStackTrace();
+            return;
+        }
 
-        // The response string we are gonna prepare to send to the client
+        Server server = new Server(multicastAddress, Integer.parseInt(args[2]),  serverAddress,  Integer.parseInt(args[0]));
+
+        server.multicastThreadSetup();
+
+        try {
+            server.openSocket();
+        } catch (SocketException e) {
+            e.printStackTrace();
+            return;
+        }
+        String command;
         String response;
 
-        // the port we are going to be use to open the datagramSocket, for this work it is 4445
-        int port = Integer.parseInt(args[0]);
-
-        // creating the socket to send messages to and receive from
-        socket = new DatagramSocket(port);
-
-        // hashmap to hold all the combinations of dns names and ip addresses
-        HashMap<String, String> dnsHashMap = new HashMap<String, String>();
-
-        // Used to determine if the dns name we receive from the client is present in the hash table
-        boolean isKeyPresent;
-
-        // used to store the hashmapsize, when the user asks to register a dns name if sucessfull we are going
-        // to respond with number of dns name already registered
-        int hashMapSize;
-
-        // used to store the parameters and operation received from the client
-        String[] tokens;
-
-        Runnable runnable;
-        //InetAddress multicastAddress = InetAddress.getByName(args[1]);
-        InetAddress multicastAddress = InetAddress.getLocalHost();
-        int multicastPort = Integer.parseInt(args[2]);
-        int port1 = Integer.parseInt(args[0]);
-        InetAddress serverAddress = InetAddress.getLocalHost();
-
-        runnable = new MyRunnable(multicastAddress, multicastPort,serverAddress, port1);
-        ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
-        service.scheduleAtFixedRate(runnable, 0, 1, TimeUnit.SECONDS);
-
-        // main part of the server's code
         while(true){
-            response = "";
-            receivedBytes =  new byte[65535];
-            // creating a new datagramPacket so that we can received and store the one received from the client
-            DpReceived = new DatagramPacket(receivedBytes, receivedBytes.length);
 
-            System.out.println("Waiting for command from a client.......");
 
-            // waiting to receive a datagram packet from the client,  the execution of the program stops here until that happens
-            try {
-                socket.receive(DpReceived);
-            }
-            catch(IOException e){
-                System.out.println(e.getMessage());
+            if(server.receiveCommand()!=0){
+                System.out.println("Problem Receiving command from a client");
                 continue;
-            }
+            };
+
+            server.processCommand();
+
 
             try {
-                Thread.sleep(20000);
-            } catch (InterruptedException e) {
-                System.out.println(e.getMessage());
-                continue;
-            }
-            // converting the bytes into string format UTF8
-            receivedString = new String(DpReceived.getData());
-            receivedString = receivedString.trim();
-
-            System.out.println("(1) Client's commmand:" + receivedString);
-
-            // splitting the command up for processing
-            tokens = receivedString.split(" ", 3);
-
-            // there are no commands that can come from the client that have less than or equal to 1 argument
-            if(tokens.length <= 1){
-                System.out.println("Error in the command received");
-                continue;
+                server.issueResponse();
+            } catch (IOException e) {
+                e.printStackTrace();
+                System.out.println("Problem sending a response to a client");
             }
 
-            switch (tokens[0]){
+
+        }
+
+    }
+
+    public Server(InetAddress multicastAddress, int multicastPort, InetAddress serverAddress, int serverPort){
+
+        this.multicastAddress = multicastAddress;
+        this.multicastPort = multicastPort;
+        this.serverAddress = serverAddress;
+        this.serverPort = serverPort;
+        this.dnsHashMap = new HashMap<String, String>();
+
+    }
+
+    public int receiveCommand(){
+
+        byte[] receivedBytes = new byte[65535];
+        this.packetReceived = new DatagramPacket(receivedBytes, receivedBytes.length);
+
+        System.out.println("Waiting for command from a client.......");
+
+        // waiting to receive a datagram packet from the client,  the execution of the program stops here until that happens
+        try {
+            socket.receive(this.packetReceived);
+        }
+        catch(IOException e){
+            System.out.println(e.getMessage());
+            return -1;
+        }
+
+        command = new String(this.packetReceived.getData());
+        command = command.trim();
+
+        return 0;
+
+    }
+
+    public void processCommand() {
+
+        boolean isKeyPresent;
+        String[] tokens = command.split(" ", 3);
+        response = new String();
+
+        // there are no commands that can come from the client that have less than or equal to 1 argument
+        if (tokens.length <= 1) {
+            System.out.println("Error in the command received");
+            response = "ERROR";
+        } else {
+            switch (tokens[0]) {
                 case "REGISTER":
 
                     // checking if the command REGISTER that came from the client has the correct number of arguments
-                    if(tokens.length != 3){
+                    if (tokens.length != 3) {
                         System.out.println("Error in the messaged received, register command should have 3 arguments");
-                    }
-                    else{
+                    } else {
                         // checking if the key is present or not already in the hashMap
                         isKeyPresent = dnsHashMap.containsKey(tokens[1]);
-                        if(isKeyPresent == true){
+                        if (isKeyPresent) {
                             System.out.println("The key the client tried to register is already registered, try using the lookup command");
 
                             //preparing the response in string format to send to the client
                             response = String.valueOf(-1);
-                        }
-                        else {
+                        } else {
                             System.out.println("Key was successfully added to the dns server " + tokens[1] + " " + tokens[2]);
 
                             // adding the pair DNSname and IpAdress to the HashMap
                             dnsHashMap.put(tokens[1], tokens[2]);
 
                             // getting the hashMap size to send to the client has a response
-                            hashMapSize = dnsHashMap.size();
+                            int hashMapSize = dnsHashMap.size();
 
                             //preparing the response in string format to send to the client
                             response = String.valueOf(hashMapSize);
-                        }
-
-                        // sending the response to the client
-                        try {
-                            sendMessage(response, DpReceived, socket);
-                        }
-                        catch(IOException e){
-                            System.out.println(e.getMessage());
-                            continue;
                         }
                     }
                     break;
                 case "LOOKUP":
                     // checking if the command LOOKUP that came from the client has the correct number of arguments
-                    if(tokens.length != 2){
+                    if (tokens.length != 2) {
                         System.out.println("Error in the messaged received, lookup command should have 2 arguments");
-                    }
-                    else{
+                    } else {
                         // checking if the key is present or not already in the hashMap
                         isKeyPresent = dnsHashMap.containsKey(tokens[1]);
 
@@ -228,26 +248,16 @@ public class Server {
                                 + tokens[1]
                                 + " exists: "
                                 + isKeyPresent);
-                        if(isKeyPresent == true){
+                        if (isKeyPresent) {
                             System.out.println("The dns name is in the dns server, sending the ip Address to th client");
 
                             // preparing the response to send to the client in case of success of the command LOOKUP
                             response = tokens[1] + " " + dnsHashMap.get(tokens[1]);
-                        }
-                        else {
+                        } else {
                             System.out.println("the dns name is not in the dns server, try using the register command");
 
                             // preparing the response to send to the client in case of failure of the command LOOKUP
                             response = "NOT FOUND";
-                        }
-
-                        // sending the response to the client
-                        try {
-                            sendMessage(response, DpReceived, socket);
-                        }
-                        catch(IOException e){
-                            System.out.println(e.getMessage());
-                            continue;
                         }
                     }
                     break;
@@ -255,63 +265,113 @@ public class Server {
                 default:
                     // preparing and sending a response to the client in case the command that was sent was not a valid one
                     System.out.println("The command is not valid. Valid command are REGISTER and LOOKUP");
-                    response = String.valueOf(-2);
-
-                    // sending the response to the client
-                    try {
-                        sendMessage(response, DpReceived, socket);
-                    }
-                    catch(IOException e){
-                        System.out.println(e.getMessage());
-                        continue;
-                    }
+                    response = "ERROR";
                     break;
             }
-            System.out.println("Server's Response: " + response);
+            System.out.println("Server :" + command + " - " + response);
         }
     }
+    
+    public void issueResponse() throws IOException {
 
+        // used to store the ip adress of the client obtained from the datagramPacket we received from the client
+        InetAddress address;
+
+        // the bytes we are going to send in the datagram packet, obtained from the string messageToSend
+        byte[] sentBytes;
+
+        // the effective datagram we are going to be sending to the client
+        DatagramPacket DpSent;
+
+        // the client's port obtained form the datagramPacket we received from the client
+        int clientPort;
+
+        clientPort = this.packetReceived.getPort();
+        address = this.packetReceived.getAddress();
+        sentBytes = response.getBytes();
+        DpSent = new DatagramPacket(sentBytes, sentBytes.length, address, clientPort);
+
+        // sending the datagramPacket to the client, it may throw an IOexpection, needs to be handled in the main method of the class
+        socket.send(DpSent);
+
+    }
+
+    /**
+     * Class method that creates the datagramSocket and imposes the timeout period in case
+     * the client gets stuck for too long sending a command to the server or receiving a
+     * response from the server
+     */
+    public void openSocket() throws SocketException {
+        socket = new DatagramSocket(this.serverPort);
+    }
+
+    /**
+     * Class method that closes the datagramSocket
+     */
+    public void closeSocket(){
+        socket.close();
+    }
+
+    /**
+     * Class method used to setup the thread responsible for the advertisement part of the server
+     */
+    public void multicastThreadSetup(){
+        Runnable runnable = new MyRunnable(multicastAddress, multicastPort,serverAddress, serverPort);
+        ScheduledExecutorService service = Executors.newSingleThreadScheduledExecutor();
+        service.scheduleAtFixedRate(runnable, 0, 1, TimeUnit.SECONDS);
+    }
+
+
+    /**
+     * Class that implements interface runnable, used to send, by the other server thread a timed and cyclic advertisement of the server
+     * to the multicast group
+     */
     public static class MyRunnable implements Runnable {
 
         private InetAddress multicastAddress;
         private int multicastPort;
-        private InetAddress serverAddress;
-        private int serverPort;
         private String advertisement;
-        private DatagramSocket socket;
 
 
         public MyRunnable(InetAddress multicastAddress, int multicastPort, InetAddress serverAddress, int serverPort){
 
             this.multicastAddress = multicastAddress;
             this.multicastPort = multicastPort;
-            this.serverAddress = serverAddress;
-            this.serverPort = serverPort;
             this.advertisement = serverAddress + ":" + serverPort;
 
         }
 
         public void run() {
 
+            MulticastSocket socket;
             try {
-                this.socket = new DatagramSocket();
-            } catch (SocketException e) {
-                e.printStackTrace();
-                return;
-            }
-
-            InetAddress group = this.multicastAddress;
-            byte[] buf = this.advertisement.getBytes();
-
-            DatagramPacket packet = new DatagramPacket(buf, buf.length, group, this.multicastPort);
-
-            try {
-                this.socket.send(packet);
+                socket = new MulticastSocket(this.multicastPort);
             } catch (IOException e) {
                 e.printStackTrace();
                 return;
             }
-            this.socket.close();
+
+            try {
+                socket.setTimeToLive(1);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+
+
+            byte[] buf = this.advertisement.getBytes();
+
+            DatagramPacket packet = new DatagramPacket(buf, buf.length, this.multicastAddress, this.multicastPort);
+
+            try {
+                socket.send(packet);
+            } catch (IOException e) {
+                e.printStackTrace();
+                return;
+            }
+
+            System.out.println("multicast:" + this.multicastAddress.toString() + " " + this.multicastPort + " : " + this.advertisement);
+            socket.close();
 
         }
     }

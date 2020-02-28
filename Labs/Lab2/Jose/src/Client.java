@@ -314,17 +314,15 @@ public class Client {
 
         String[] tokens = received.split(":", 3);
 
-        System.out.println("Client was able to receive the IP address of the server " + received);
 
         // The IP address of the local host is like this DESKTOP-H3MJCCQ/10.227.144.41:53
         // gives an error when using InetAddress getbyname method
         String[] tokens1 = tokens[0].split("/", 3);
         this.serverAddress = InetAddress.getByName(tokens1[1]);
         this.serverPort = Integer.parseInt(tokens[1]);
+
+        System.out.println("multicast:" + this.multicastAddress.toString() + " " + this.multicastPort + " : " + received);
     }
-
-
-
 
 
 }
