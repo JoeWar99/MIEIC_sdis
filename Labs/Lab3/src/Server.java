@@ -59,7 +59,7 @@ public class Server implements ServerInterface{
 
         if(!this.dnsIp.containsKey(dnsName)) {
             this.dnsIp.put(dnsName, ipAddress);
-            response = ""
+            response = "";
             return this.dnsIp.size() + "\n" + dnsName + " " + ipAddress;
         } else {
             return -1 + "\n" + dnsName + " " + ipAddress;
