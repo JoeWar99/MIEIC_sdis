@@ -22,19 +22,19 @@ public class Server implements ServerInterface{
             return;
         }
 
+        System.setProperty("java.rmi.server.codebase", "file:///C://Users/Martim/Desktop/MIEIC_sdis/Labs/Lab3/out/production/RMI/");
+
         Server obj = new Server();
         ServerInterface stub = (ServerInterface) UnicastRemoteObject.exportObject(obj, 0);
 
-
         // Bind the remote object's stub in the registry
         Registry registry = LocateRegistry.getRegistry();
+        // rebind is to avoid bind exceptions (in case of already use)
+        registry.rebind(args[0], stub);
+    }
 
-        try {
-            registry.bind(args[0], stub);
-        } catch (AlreadyBoundException e) {
-            e.printStackTrace();
-        }
-
+    public Server(){
+        this.dnsIp = new HashMap<String, String>();
     }
 
     public String lookup(String dnsName){
@@ -65,62 +65,4 @@ public class Server implements ServerInterface{
             return -1 + "\n" + dnsName + " " + ipAddress;
         }
     }
-
-    public Server(){
-        this.dnsIp = new HashMap<String, String>();
-    }
-    /*
-    private void run() throws IOException {
-        // get request
-        byte[] buf = new byte[256];
-        DatagramPacket packet = new DatagramPacket(buf, buf.length);
-        this.socket.receive(packet);
-        // process request and reply's
-        this.process(packet);
-    }
-
-    private void process(DatagramPacket packet) throws IOException {
-        // process and prints request
-        String received = new String(packet.getData()).trim();
-        this.print(new String[]{"Server:", received});
-        // parse the reply
-        String reply = this.parse(received);
-
-        if(reply == null) {
-            reply = Integer.toString(-1);
-        }
-
-        byte[] buf = reply.getBytes();
-
-        int clientPort = packet.getPort();
-        InetAddress clientAddress = packet.getAddress();
-
-        DatagramPacket newPacket = new DatagramPacket(buf, buf.length, clientAddress, clientPort);
-        this.socket.send(newPacket);
-    }
-
-    private String parse(String received) {
-        String[] tokens = received.trim().split(" ");
-        String reply;
-
-        if(tokens[0].equals("register")) {
-            if(!this.dnsIp.containsKey(tokens[1])) {
-                this.dnsIp.put(tokens[1], ipAddress);
-                return this.dnsIp.size() + "\n" + tokens[1] + " " + ipAddress;
-            } else {
-                return -1 + "\n" + tokens[1] + " " + ipAddress;
-            }
-        } else if(tokens[0].equals("lookup")) {
-            String name;
-            if(!this.dnsIp.containsKey(tokens[1])) {
-                return -1 + "\n" + tokens[1] + " " + dnsIp.get(tokens[1]);
-            } else {
-                return this.dnsIp.size() + "\n" + tokens[1] + " " + dnsIp.get(tokens[1]);
-            }
-        } else {
-            System.out.println("Error parsing message");
-            return null;
-        }
-    }*/
-
 }

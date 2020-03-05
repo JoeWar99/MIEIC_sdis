@@ -80,3 +80,28 @@ public class Client {
         this.socket.close();
     }
 }
+
+
+
+
+
+/*
+*  usar a classe naming ou o outro metodo static
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+*
+* */
