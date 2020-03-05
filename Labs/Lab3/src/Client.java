@@ -19,7 +19,7 @@ public class Client {
 
         try {
             String response;
-            Registry registry = LocateRegistry.getRegistry(args[0]);
+            Registry registry = LocateRegistry.getRegistry(args[0], 2020);
             ServerInterface serverStub = (ServerInterface) registry.lookup(args[1]);
 
             if(args[2].equals("register")) {

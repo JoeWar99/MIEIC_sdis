@@ -32,7 +32,7 @@ public class Server implements ServerInterface{
             // "Export" the remote object and produce the respective stub
             ServerInterface stub = (ServerInterface) UnicastRemoteObject.exportObject(obj, 0);
             // Register the stub (returns an object that represents the rmi registry)
-            Registry registry = LocateRegistry.getRegistry(1099);
+            Registry registry = LocateRegistry.createRegistry(2020);
             // It is preferable to use rebind(…), as bind(…) will throw an exception if the previously registered name is reused
             registry.rebind(objectName, stub);
             System.err.println("Server ready");
