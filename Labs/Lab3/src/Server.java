@@ -22,18 +22,14 @@ public class Server implements ServerInterface{
             return;
         }
 
+        
+
         Server obj = new Server();
         ServerInterface stub = (ServerInterface) UnicastRemoteObject.exportObject(obj, 0);
 
-
         // Bind the remote object's stub in the registry
         Registry registry = LocateRegistry.getRegistry();
-
-        try {
-            registry.bind(args[0], stub);
-        } catch (AlreadyBoundException e) {
-            e.printStackTrace();
-        }
+        registry.rebind(args[0], stub);
 
     }
 
