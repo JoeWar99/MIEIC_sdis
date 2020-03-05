@@ -1,5 +1,8 @@
-import java.io.*;
-import java.net.*;
+import java.rmi.NotBoundException;
+import java.rmi.RemoteException;
+
+import java.rmi.registry.LocateRegistry;
+import java.rmi.registry.Registry;
 
 /*
     java Client <host> <port> <oper> <opnd>*
@@ -11,74 +14,33 @@ import java.net.*;
 */
 
 public class Client {
-    private int port;
-    private DatagramSocket socket;
-    private InetAddress address;
 
-    public static void main(String[] args) throws IOException {
+    public static void main(String[] args) throws RemoteException, NotBoundException {
         if(!(args[2].equals("register") && args.length == 5) && !(args[2].equals("lookup") && args.length == 4)) {
             System.out.println("Usage: java Client <host> <port> <oper> <opnd>*");
         }
 
-        Client client = new Client(args[0], Integer.parseInt(args[1]));
-        // send packet
-        client.send(client.build(args));
-        // receive packet and print result
-        client.print(client.receive(), args);
-        // close socket
-        client.destroy();
+        String host_name = args[0];
+        String object_name = args[1];
+        String operation = args[2];
+        String dns_name = args[3];
+        // Client client = new Client(args[0], args[1], args[2], args[3]);
+
+
+        Registry registry = LocateRegistry.getRegistry(null);
+        ServerInterface serverStub = (ServerInterface) registry.lookup(object_name);
+        //ServerInterface serverStub = (ServerInterface) registry.register(object_name);
+        System.out.println(serverStub.lookup(dns_name));
     }
 
-    public Client(String address, int port) throws IOException {
-        this.port = port;
-        this.socket = new DatagramSocket();
-        this.address = InetAddress.getByName(address);
-    }
-
-    private void send(String message) throws IOException {
-        // create buffer
-        byte[] buf = message.getBytes();
-        // create packet
-        DatagramPacket packet = new DatagramPacket(buf, buf.length, this.address, this.port);
-        // send packet
-        this.socket.send(packet);
-    }
-
-    private int receive() throws IOException {
-        // create buffer
-        byte[] buf = new byte[256];
-        // create packet
-        DatagramPacket packet = new DatagramPacket(buf, buf.length);
-        // sets timeout
-        this.socket.setSoTimeout(2000);
-        // receive packet
-        this.socket.receive(packet);
-        // returns the result value
-        return Integer.parseInt(new String(packet.getData()).split("\n")[0]);
-    }
-
-    private String build(String[] args) {
-        String message = args[2];
-
-        for (int i = 3; i < args.length; i++) {
-            message += " " + args[i];
+    /*public Client(String hostName, String objectName, String operation, String dnsName) throws IOException {
+        public Client(String hostName, String objectName, String operation, String dnsName) throws IOException {
+            this.hostName = hostName;
+            this.objectName = objectName;
+            this.operation = operation;
+            this.dnsName = dnsName;
         }
-
-        return message;
-    }
-
-    // Prints the operation request and the result
-    private void print(int result, String[] args) {
-        if(result != -1) {
-            System.out.println("Client: " + this.build(args) + " : " + result);
-        } else {
-            System.out.println("Client: " + this.build(args) + " : ERROR");
-        }
-    }
-
-    public void destroy() {
-        this.socket.close();
-    }
+    }*/
 }
 
 

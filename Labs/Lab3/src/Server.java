@@ -13,8 +13,6 @@ import java.util.HashMap;
 
 public class Server implements ServerInterface{
     public HashMap<String, String> dnsIp;
-    public DatagramSocket socket;
-    public int port;
 
     public static void main(String args[]) throws IOException {
         if (args.length != 1) {
@@ -22,14 +20,15 @@ public class Server implements ServerInterface{
             return;
         }
 
+        // Programmatically set the value of the property java.rmi.server.codebase to the location of the codebase
         System.setProperty("java.rmi.server.codebase", "file:///C://Users/Martim/Desktop/MIEIC_sdis/Labs/Lab3/out/production/RMI/");
-
+        // instantiate the "remote object".
         Server obj = new Server();
+        // "export" the remote object and produce the respective stub
         ServerInterface stub = (ServerInterface) UnicastRemoteObject.exportObject(obj, 0);
-
-        // Bind the remote object's stub in the registry
-        Registry registry = LocateRegistry.getRegistry();
-        // rebind is to avoid bind exceptions (in case of already use)
+        // Register the stub (returns an object that represents the rmi registry)
+        Registry registry = LocateRegistry.getRegistry(2001);
+        // It is preferable to use rebind(…), as bind(…) will throw an exception if the previously registered name is reused
         registry.rebind(args[0], stub);
     }
 
@@ -38,31 +37,28 @@ public class Server implements ServerInterface{
     }
 
     public String lookup(String dnsName){
-
-        String response = "lookup " + dnsName;
+        String response = "lookup " + dnsName + " : ";
 
         if(!this.dnsIp.containsKey(dnsName)) {
-            response = response + ": -1";
-            System.out.println(response);
-            return response;
+            response += "-1";
         } else {
-            response = response + ": " + this.dnsIp.size();
-            System.out.println(response);
-            return response;
+            response += this.dnsIp.size();
         }
+
+        System.out.println(response);
+        return response;
     }
 
     public String register(String dnsName, String ipAddress){
-        String response;
-
-        response = "register " + dnsName + " " + ipAddress + " : ";
+        String response = "register " + dnsName + " " + ipAddress + " : ";
 
         if(!this.dnsIp.containsKey(dnsName)) {
             this.dnsIp.put(dnsName, ipAddress);
-            response = "";
-            return this.dnsIp.size() + "\n" + dnsName + " " + ipAddress;
+            response += this.dnsIp.size();
         } else {
-            return -1 + "\n" + dnsName + " " + ipAddress;
+            response += "-1";
         }
+        System.out.println(response);
+        return response;
     }
 }
