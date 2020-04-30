@@ -19,7 +19,7 @@ public class Server implements ServerInterface{
         // Receives the object name in the command line
         String objectName = args[0];
         // Programmatically set the value of the property java.rmi.server.codebase to the location of the codebase
-        System.setProperty("java.rmi.server.codebase", "file:///C://Users/Martim/Desktop/MIEIC_sdis/Labs/Lab3/out/production/RMI/");
+        System.setProperty("java.rmi.server.codebase", "file:///C://Users/coman/Desktop/MIEIC_sdis/Labs/Lab3/out/production/RMI/");
 
         try {
             // Instantiate the "remote object".
